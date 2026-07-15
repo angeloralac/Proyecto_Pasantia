@@ -129,13 +129,30 @@ const updateVenta = async (req, res) => {
   }
 };
 
-
+const getVentaByCreationDate = async (req, res) => {
+  try {
+    const { fecha } = req.params;
+    const ventas = await venta.findAll({
+      where: {
+        createdAt: fecha
+      }
+    });
+    if (ventas.length === 0) {
+      return res.status(404).json({ error: 'No se encontraron ventas para la fecha proporcionada' });
+    }
+    res.status(200).json(ventas);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Error al obtener las ventas por fecha' });
+  }
+};
 
 module.exports = { 
   getVentas, 
   getVentaByFactura,
   getUltimasVentas,
   storeVenta,
+  getVentaByCreationDate,
   deleteVenta,
   updateVenta,
 
