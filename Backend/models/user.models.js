@@ -17,15 +17,24 @@ const User = Sequelize.define("user", {
   nombre: {
     type: DataTypes.STRING,
     allowNull: false,
+    validate: {
+      notEmpty: true 
+    }
   },
   email: {
     type: DataTypes.STRING,
     allowNull: false,
     unique: true,
+    validate: {
+      notEmpty: true 
+    }
   },
   contrasena: {
     type: DataTypes.TEXT, 
     allowNull: false,
+    validate: {
+      notEmpty: true 
+    }
   }
 }, {
 

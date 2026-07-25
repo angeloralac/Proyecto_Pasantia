@@ -59,7 +59,7 @@ const deleteUser = async (req, res) => {
 
 const login = async (req, res) => {
     try {
-        const { email, contrasena } = req.body;
+        const { nombre, email, contrasena } = req.body;
 
         const usuario =  await UserModel.scope(null).findOne({ where: { email } });
         if (!usuario) {
