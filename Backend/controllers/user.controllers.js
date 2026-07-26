@@ -47,15 +47,21 @@ const updateUser = async (req, res) => {
 
 const deleteUser = async (req, res) => {
   try {
-    const user = await UserModel.findByPk(req.params.id);
+    const idUserDelete = req.params.id;
+    const idUserLogeado = req.user.id;
+
+    if (parseInt(idUserDelete) === parseInt(idUserLogeado)) {
+      return res.status(403).json({ error: "No puedes eliminar tu propia cuenta." });
+    }
+    const user = await UserModel.findByPk(idUsuarioAEliminar);
     if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
+  
     await user.destroy();
     res.status(200).json({ message: "Usuario eliminado" });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
 };
-
 
 const login = async (req, res) => {
     try {
@@ -79,12 +85,12 @@ const login = async (req, res) => {
 
         res.json({
             mensaje: "Login exitoso",
-          
+          token: token,
             user: {
                 id: usuario.id,
                 email: usuario.email,
                 name: usuario.nombre,
-                token
+                token: token
             }
         });
 

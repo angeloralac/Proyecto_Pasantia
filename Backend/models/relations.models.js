@@ -9,7 +9,6 @@ Cliente.hasMany(Venta, { foreignKey: 'clienteId' });
 Venta.belongsTo(Cliente, { foreignKey: 'clienteId' });
 
 
-
 Articulo.hasMany(Venta, { foreignKey: 'articuloId' });
 Venta.belongsTo(Articulo, { foreignKey: 'articuloId' });
 

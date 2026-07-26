@@ -49,11 +49,11 @@ const User = Sequelize.define("user", {
       }
     },
     beforeUpdate: async (user) => { 
-      if (user.changed('contrasena')) {
-        const salt = await bcrypt.genSalt(10);
-        user.contrasena = await bcrypt.hash(user.contrasena, salt);
-      }
-    }
+      if (user.changed('contrasena') && user.contrasena) {
+    const salt = await bcrypt.genSalt(10);
+    user.contrasena = await bcrypt.hash(user.contrasena, salt);
+  }
+  }
   }
 });
 
