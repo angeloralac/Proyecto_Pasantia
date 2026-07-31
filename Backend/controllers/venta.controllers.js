@@ -1,10 +1,10 @@
-const venta = require('../models/venta.models');
-const articulo = require('../models/articulo.models');
+const ventamodel = require('../models/venta.models');
+const articulomodel = require('../models/articulo.models');
 
 
 const getVentas = async (req, res) => {
   try {
-    const ventas = await venta.findAll({});
+    const ventas = await ventamodel.findAll({});
     res.status(200).json(ventas);
   } catch (error) {
     console.error(error);
@@ -15,7 +15,7 @@ const getVentas = async (req, res) => {
 const getVentaByFactura = async (req, res) => {
   try {
     const { factura } = req.params;
-    const ventas = await venta.findAll({
+    const ventas = await ventamodel.findAll({
       where: { factura: factura }
     });
     if (ventas.length === 0) {
@@ -30,7 +30,7 @@ const getVentaByFactura = async (req, res) => {
 
 const getUltimasVentas = async (req, res) => {
   try {
-    const ultimasVentas = await venta.findAll({
+    const ultimasVentas = await ventamodel.findAll({
       order: [['createdAt', 'DESC']],
       limit: 5
     });
@@ -41,36 +41,82 @@ const getUltimasVentas = async (req, res) => {
   }
 };
 
+
 const storeVenta = async (req, res) => {
   try {
-    const { productos } = req.body; 
+
+        console.log('Body recibido:', JSON.stringify(req.body, null, 2));
+    console.log('Productos:', req.body.productos);
+
+    const { productos } = req.body;
+    
+    // Validación básica
+    if (!productos || !Array.isArray(productos) || productos.length === 0) {
+      return res.status(400).json({ error: 'Se requiere al menos un producto' });
+    }
+    
     const codigoFactura = `FAC-${Date.now()}`;
     
-    for (const item of productos) {
-      await venta.create({
-        factura: codigoFactura,
-        cantidad: item.cantidad,
-        precioCosto: item.precioCosto,
-        precioVenta: item.precioVenta,
-        descuento: item.descuento,
-        total: item.total,
-        articuloId: item.articuloId,
-        clienteId: item.clienteId
-      });
+    console.log('Procesando venta:', { codigoFactura, productos });
+    
+    // Usar transacción para asegurar consistencia
+    const resultado = await ventamodel.sequelize.transaction(async (t) => {
+      for (const item of productos) {
+        console.log('Creando registro de venta para artículo:', item.articuloId);
+        
+        // Crear el registro de venta
+        await ventamodel.create({
+          factura: codigoFactura,
+          cantidad: item.cantidad,
+          precioCosto: item.precioCosto,
+          precioVenta: item.precioVenta,
+          descuento: item.descuento || 0,
+          total: item.total,
+          articuloId: item.articuloId,
+          clienteId: item.clienteId
+        }, { transaction: t });
 
-      const articuloToUpdate = await articulo.findByPk(item.articuloId);
-      articuloToUpdate.stock = articuloToUpdate.stock - item.cantidad;
-      await articuloToUpdate.save();
-    }
-    res.status(201).json({ message: 'Venta creada exitosamente', factura: codigoFactura });
+        // Actualizar stock
+        const articuloToUpdate = await articulomodel.findByPk(item.articuloId, { transaction: t });
+        
+        if (!articuloToUpdate) {
+          throw new Error(`Artículo con ID ${item.articuloId} no encontrado`);
+        }
+        
+        if (articuloToUpdate.stock < item.cantidad) {
+          throw new Error(`Stock insuficiente para el artículo ${articuloToUpdate.nombre}`);
+        }
+        
+        console.log(`Actualizando stock de ${articuloToUpdate.nombre}: ${articuloToUpdate.stock} -> ${articuloToUpdate.stock - item.cantidad}`);
+        
+        articuloToUpdate.stock = articuloToUpdate.stock - item.cantidad;
+        await articuloToUpdate.save({ transaction: t });
+      }
+      
+      return codigoFactura;
+    });
+    
+    res.status(201).json({ 
+      message: 'Venta creada exitosamente', 
+      factura: resultado 
+    });
+    
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: 'Error al crear la venta' });  
+    console.error('Error al crear la venta:', error);
+    
+    // Mensaje de error más específico
+    const errorMessage = error.message || 'Error al crear la venta';
+    res.status(500).json({ 
+      error: errorMessage,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 };
 
+module.exports = { storeVenta };
+
 const buscarVentaOError = async (id) => {
-  const ventaExistente = await venta.findByPk(id);
+  const ventaExistente = await ventamodel.findByPk(id);
   if (!ventaExistente) {
     throw new Error('Venta no encontrada');
   }
@@ -81,12 +127,12 @@ const buscarVentaOError = async (id) => {
 const deleteVenta = async (req, res) => {
   try {
     const { factura } = req.params;
-    const ventas = await venta.findAll({
+    const ventas = await ventamodel.findAll({
       where: { factura: factura }
     });
     for (const vent of ventas) {
       // restauramos el stock del artículo correspondiente
-      const articuloToUpdate = await articulo.findByPk(vent.articuloId);
+      const articuloToUpdate = await articulomodel.findByPk(vent.articuloId);
       if (articuloToUpdate) {
         articuloToUpdate.stock = articuloToUpdate.stock + vent.cantidad;
         await articuloToUpdate.save();
@@ -110,7 +156,7 @@ const updateVenta = async (req, res) => {
     const ventaExistente = await buscarVentaOError(id);
 
   
-    const articuloToUpdate = await articulo.findByPk(ventaExistente.articuloId);
+    const articuloToUpdate = await articulomodel.findByPk(ventaExistente.articuloId);
     if (articuloToUpdate) {
       articuloToUpdate.stock = articuloToUpdate.stock + ventaExistente.cantidad - nuevaCantidad;
       await articuloToUpdate.save();
@@ -132,7 +178,7 @@ const updateVenta = async (req, res) => {
 const getVentaByCreationDate = async (req, res) => {
   try {
     const { fecha } = req.params;
-    const ventas = await venta.findAll({
+    const ventas = await ventamodel.findAll({
       where: {
         createdAt: fecha
       }

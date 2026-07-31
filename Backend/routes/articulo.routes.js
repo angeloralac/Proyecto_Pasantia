@@ -10,10 +10,10 @@ router.get('/findID/:codigo', articuloControllers.getArticuloById);
 router.get('/search', articuloControllers.searchArticulos);
 
 // Usar validarStock para crear artículos
-router.post('/', authGuard, articuloControllers.createArticulo);
-router.post('/store', authGuard, articuloControllers.createArticulo);
-router.post('/search', articuloControllers.searchArticulos);
-router.put('/:codigo', authGuard, articuloControllers.updateArticulo);
+router.post('/', articuloControllers.createArticulo);
+router.post('/store', articuloControllers.createArticulo);
+router.get('/search', articuloControllers.searchArticulos);
+router.get('/:codigo', articuloControllers.updateArticulo);
 router.delete('/:codigo', authGuard, articuloControllers.deleteArticulo);
 
 

@@ -4,13 +4,13 @@ const { storeVenta, getVentas, getVentaByFactura, deleteVenta, updateVenta, getU
 const authGuard = require('../middlewares/jwt.guard');
 
 router.get('/', getVentas);
-router.get('/factura/:factura', authGuard, getVentaByFactura);
-router.get('/ultimasventas', authGuard, getUltimasVentas);
-router.get('/fecha/:fecha', authGuard, getVentaByCreationDate);
+router.get('/factura/:factura', getVentaByFactura);
+router.get('/ultimasventas', getUltimasVentas);
+router.get('/fecha/:fecha' , getVentaByCreationDate);
 
-router.post('/store', authGuard, storeVenta);
-router.delete('/all-products/:factura', authGuard, deleteVenta);
-router.put('/:id', authGuard, updateVenta);
+router.post('/store', storeVenta);
+router.delete('/all-products/:factura', deleteVenta);
+router.put('/:id', updateVenta);
 
 
 module.exports = router;
