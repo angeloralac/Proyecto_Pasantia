@@ -3,6 +3,7 @@ const ventamodel = require('../models/venta.models');
 const articulomodel = require('../models/articulo.models');
 const Cliente = require('../models/cliente.models'); 
 const Usuario = require('../models/user.models');
+const Caja = require('../models/caja.models'); // <-- Importamos el modelo de Caja para la validación
 
 // Función de ayuda (Helper)
 const buscarVentaOError = async (id, transaction = null) => {
@@ -69,9 +70,22 @@ const storeVenta = async (req, res) => {
     const codigoFactura = `FAC-${Date.now()}`;
     
     const resultado = await ventamodel.sequelize.transaction(async (t) => {
+      
+      // --- CAMBIO QUIRÚRGICO: Validación obligatoria de caja abierta ---
+      const cajaAbierta = await Caja.findOne({ 
+        where: { estado: 'abierta' },
+        transaction: t 
+      });
+
+      if (!cajaAbierta) {
+        throw new Error('No hay ninguna caja abierta en este momento. Debes abrir caja para registrar ventas.');
+      }
+      // -----------------------------------------------------------------
+
       for (const item of productos) {
         await ventamodel.create({
           factura: codigoFactura,
+          cajaId: cajaAbierta.id, // <-- Vinculamos la venta con la caja activa
           cantidad: item.cantidad,
           precioCosto: item.precioCosto,
           precioVenta: item.precioVenta,
@@ -235,14 +249,12 @@ const getTopArticulos = async (req, res) => {
     const { fechaInicio, fechaFin } = req.query;
     let whereCondition = {};
     
-    // Si el usuario envió fechas, filtramos el periodo
     if (fechaInicio && fechaFin) {
       whereCondition.createdAt = {
         [Op.between]: [new Date(fechaInicio), new Date(fechaFin)]
       };
     }
 
-    // Le pedimos a Sequelize que sume las cantidades y los totales, agrupándolos por artículo
     const topArticulos = await ventamodel.findAll({
       attributes: [
         'articuloId',
@@ -250,14 +262,12 @@ const getTopArticulos = async (req, res) => {
         [ventamodel.sequelize.fn('SUM', ventamodel.sequelize.col('total')), 'dineroGenerado']
       ],
       where: whereCondition,
-      group: ['articuloId'], // Agrupa los cálculos por ID del artículo
-      order: [[ventamodel.sequelize.fn('SUM', ventamodel.sequelize.col('cantidad')), 'DESC']], // Ordena del más vendido al menos vendido
-      limit: 10 // Traemos el Top 10
+      group: ['articuloId'],
+      order: [[ventamodel.sequelize.fn('SUM', ventamodel.sequelize.col('cantidad')), 'DESC']],
+      limit: 10
     });
 
-    // Como la tabla de ventas solo tiene el ID del artículo, buscamos sus nombres para que la tabla sea legible
     const resultadosConNombres = await Promise.all(topArticulos.map(async (item) => {
-      // Sequelize devuelve los resultados agrupados dentro de `dataValues`
       const data = item.dataValues; 
       const articulo = await articulomodel.findByPk(data.articuloId);
       
@@ -275,7 +285,6 @@ const getTopArticulos = async (req, res) => {
     res.status(500).json({ error: 'Error al calcular el top de artículos' });
   }
 };
-
 
 // Exportación única y limpia
 module.exports = { 

@@ -4,15 +4,24 @@ const bcrypt = require("bcrypt");
 
 const createUser = async (req, res) => {
   try {
-    const user = await UserModel.create(req.body);
+    const { nombre, email, contrasena, fotografia } = req.body;
+
+    // Creamos el usuario asegurando que si no viene foto, sea null
+    const user = await UserModel.create({
+      nombre,
+      email,
+      contrasena,
+      fotografia: fotografia || null
+    });
+
     res.status(201).json({
       user,
       token: jwt.sign({ id: user.id, email: user.email }, 'misecretJWT', { expiresIn: '2h' })
     });
     
   } catch (error) {
+    console.error('Error al crear usuario:', error);
     res.status(500).json({ error: error.message });
-    
   }
 };
 
@@ -54,7 +63,9 @@ const deleteUser = async (req, res) => {
     if (parseInt(idUserDelete) === parseInt(idUserLogeado)) {
       return res.status(403).json({ error: "No puedes eliminar tu propia cuenta." });
     }
-    const user = await UserModel.findByPk(idUsuarioAEliminar);
+    
+    // Corregido: Usamos la variable idUserDelete correctamente
+    const user = await UserModel.findByPk(idUserDelete);
     if (!user) return res.status(404).json({ error: "Usuario no encontrado" });
   
     await user.destroy();
@@ -66,7 +77,7 @@ const deleteUser = async (req, res) => {
 
 const login = async (req, res) => {
     try {
-        const { nombre, email, contrasena } = req.body;
+        const { email, contrasena } = req.body;
 
         const usuario =  await UserModel.scope(null).findOne({ where: { email } });
         if (!usuario) {
@@ -86,7 +97,7 @@ const login = async (req, res) => {
 
         res.json({
             mensaje: "Login exitoso",
-          token: token,
+            token: token,
             user: {
                 id: usuario.id,
                 email: usuario.email,
@@ -96,9 +107,9 @@ const login = async (req, res) => {
         });
 
     } catch (error) {
-      console.log(error);
+        console.log(error);
         res.status(500).json({ mensaje: "Error en el servidor", error });
     }
-}
+};
 
 module.exports = { createUser, getAllUsers, getUserById, updateUser, deleteUser, login };

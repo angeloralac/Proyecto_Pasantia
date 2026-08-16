@@ -5,10 +5,12 @@ const userRoutes = require('./user.routes');
 const articuloRoutes = require('./articulo.routes');
 const clienteRoutes = require('./cliente.routes');
 const ventaRoutes = require('./venta.routes');
+const cajaRoutes = require('./caja.routes');
 
 router.use('/users', userRoutes);
 router.use('/articulos', articuloRoutes);
 router.use('/clientes', clienteRoutes);
 router.use('/ventas', ventaRoutes);
+router.use('/caja', cajaRoutes);
 
 module.exports = router;
