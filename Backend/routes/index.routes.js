@@ -6,6 +6,10 @@ const articuloRoutes = require('./articulo.routes');
 const clienteRoutes = require('./cliente.routes');
 const ventaRoutes = require('./venta.routes');
 const cajaRoutes = require('./caja.routes');
+const reportesRoutes = require('./reporte.routes');
+
+// Rutas principales
+router.use('/reportes', reportesRoutes);
 
 router.use('/users', userRoutes);
 router.use('/articulos', articuloRoutes);

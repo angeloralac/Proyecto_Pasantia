@@ -3,7 +3,7 @@ const ventamodel = require('../models/venta.models');
 const articulomodel = require('../models/articulo.models');
 const Cliente = require('../models/cliente.models'); 
 const Usuario = require('../models/user.models');
-const Caja = require('../models/caja.models'); // <-- Importamos el modelo de Caja para la validación
+const Caja = require('../models/caja.models'); // Lo mantenemos porque se usa en getDetallesVenta
 
 // Función de ayuda (Helper)
 const buscarVentaOError = async (id, transaction = null) => {
@@ -63,6 +63,9 @@ const storeVenta = async (req, res) => {
   try {
     const { productos, clienteId } = req.body;
     
+    // Obtenemos el ID de la caja inyectado por nuestro middleware de seguridad
+    const cajaActivaId = req.cajaActivaId; 
+    
     if (!productos || !Array.isArray(productos) || productos.length === 0) {
       return res.status(400).json({ error: 'Se requiere al menos un producto' });
     }
@@ -71,21 +74,12 @@ const storeVenta = async (req, res) => {
     
     const resultado = await ventamodel.sequelize.transaction(async (t) => {
       
-      // --- CAMBIO QUIRÚRGICO: Validación obligatoria de caja abierta ---
-      const cajaAbierta = await Caja.findOne({ 
-        where: { estado: 'abierta' },
-        transaction: t 
-      });
-
-      if (!cajaAbierta) {
-        throw new Error('No hay ninguna caja abierta en este momento. Debes abrir caja para registrar ventas.');
-      }
-      // -----------------------------------------------------------------
+      // ELIMINADO: La búsqueda manual de la caja. El middleware ya lo confirmó.
 
       for (const item of productos) {
         await ventamodel.create({
           factura: codigoFactura,
-          cajaId: cajaAbierta.id, // <-- Vinculamos la venta con la caja activa
+          cajaId: cajaActivaId, // <-- Usamos directamente el ID que nos pasó el guardián
           cantidad: item.cantidad,
           precioCosto: item.precioCosto,
           precioVenta: item.precioVenta,
@@ -286,7 +280,70 @@ const getTopArticulos = async (req, res) => {
   }
 };
 
-// Exportación única y limpia
+// OBTENER DETALLES DE VENTA (Actualizado con Vendedor y Cliente)
+const getDetallesVenta = async (req, res) => {
+  try {
+    const { factura } = req.query;
+    let facturasABuscar = [];
+
+    // Si se proporciona una factura específica, la buscamos; si no, tomamos las últimas 3 facturas
+    if (factura) {
+      facturasABuscar = [factura];
+    } else {
+      const todasLasVentas = await ventamodel.findAll({ order: [['createdAt', 'DESC']] });
+      facturasABuscar = [...new Set(todasLasVentas.map(v => v.factura))].slice(0, 3);
+    }
+    if (facturasABuscar.length === 0) return res.status(200).json([]);
+
+    // 0. Obtenemos todas las ventas correspondientes a las facturas encontradas
+    const ventas = await ventamodel.findAll({
+      where: { factura: facturasABuscar },
+      order: [['createdAt', 'DESC']]
+    });
+
+    // 1. Buscamos las cajas y usuarios (Vendedores)
+    const cajaIds = [...new Set(ventas.map(v => v.cajaId).filter(id => id !== null))];
+    const cajas = await Caja.findAll({ where: { id: cajaIds } });
+    const cajaToUsuario = {};
+    cajas.forEach(c => cajaToUsuario[c.id] = c.usuarioId);
+
+    // 1.1 Buscamos a los Usuarios (Vendedores)
+    const usuarioIds = [...new Set(cajas.map(c => c.usuarioId).filter(id => id !== null))];
+    const usuarios = await Usuario.findAll({ where: { id: usuarioIds } });
+    const usuarioInfo = {};
+    usuarios.forEach(u => usuarioInfo[u.id] = u.nombre);
+
+    // Buscamos a los Clientes
+    const clienteIds = [...new Set(ventas.map(v => v.clienteId).filter(id => id !== null))];
+    const clientes = await Cliente.findAll({ where: { id: clienteIds } });
+    const clienteInfo = {};
+    clientes.forEach(c => clienteInfo[c.id] = c.nombre); 
+
+    // 2. Armamos la respuesta con Producto, Vendedor y Cliente
+    const detallesConNombres = await Promise.all(ventas.map(async (v) => {
+      const articulo = await articulomodel.findByPk(v.articuloId);
+      const usuarioId = cajaToUsuario[v.cajaId];
+      
+      // Determinamos el nombre del cliente (o Consumidor Final si es nulo)
+      const nombreDelCliente = v.clienteId && clienteInfo[v.clienteId] 
+        ? clienteInfo[v.clienteId] 
+        : (v.clienteId ? `Cliente ID: ${v.clienteId}` : 'Consumidor Final');
+
+      return {
+        ...v.dataValues,
+        articuloNombre: articulo ? articulo.nombre : 'Producto Eliminado',
+        vendedor: usuarioId && usuarioInfo[usuarioId] ? usuarioInfo[usuarioId] : 'Desconocido',
+        cliente: nombreDelCliente 
+      };
+    }));
+
+    res.status(200).json(detallesConNombres);
+  } catch (error) {
+    console.error('Error al obtener detalles de venta:', error);
+    res.status(500).json({ error: 'Error al obtener el desglose de las ventas' });
+  }
+};
+
 module.exports = { 
   getVentas, 
   getVentaByFactura,
@@ -296,5 +353,6 @@ module.exports = {
   deleteVenta,
   updateVenta,
   getDashboardMetrics,
-  getTopArticulos
+  getTopArticulos,
+  getDetallesVenta
 };

@@ -1,41 +1,29 @@
 const jwt = require('jsonwebtoken');
 
-const User = require('../models/user.models');
 
-const ACCESS_SECRET = "misecretJWT";
-
-const authGuard = async (req, res, next) => {
-    // 1. Obtener el header Authorization
+const authGuard = (req, res, next) => {
     const authHeader = req.headers['authorization'];
     
-    // El header llega como "Bearer TOKEN_AQUÍ", así que separamos el string
-    const token = authHeader && authHeader.split(' ')[1];
-    console.log(token);
+    // Verificamos si el encabezado de autorización está presente y tiene el formato correcto
+    console.log("Header Authorization recibido:");
 
-    // Si no enviaron ningún token
+    const token = authHeader && authHeader.split(' ')[1]; 
+
     if (!token) {
-        return res.status(401).json({ mensaje: "Acceso denegado. Token no proporcionado." });
+        console.log(" No se encontró token o el formato no es 'Bearer <token>'");
+        return res.status(401).json({ message: 'Token no proporcionado' });
     }
 
     try {
-        // 2. Verificar si el token es válido y no ha expirado
-        const datosDecodificados = jwt.verify(token, ACCESS_SECRET);
-
-        // 3. Buscar al usuario en la base de datos con Sequelize (Usa el defaultScope automáticamente)
-        const usuario = await User.findByPk(datosDecodificados.id);
-
-        if (!usuario) {
-            return res.status(404).json({ mensaje: "Usuario no encontrado en el sistema." });
-        }
-
-        // 4. Guardar el usuario completo en el objeto req para que la ruta final lo use
-        req.usuario = usuario;
-
-        // Pasamos al siguiente paso (la ruta protegida)
+        // Probamos con las variables de entorno en orden de prioridad, y si no existen, usamos la clave de respaldo
+        const secret = process.env.ACCESS_TOKEN_SECRET || process.env.JWT_SECRET || process.env.SECRET_KEY || 'clave_respaldo_emergencia';
+        
+        const verified = jwt.verify(token, secret);
+        req.user = verified;
         next();
     } catch (error) {
-        // Si el token expiró o la firma está mal, jwt.verify lanzará un error
-        return res.status(403).json({ mensaje: "Token inválido o expirado." });
+        console.log("Error al verificar token:", error.message);
+        return res.status(401).json({ message: 'Token inválido o expirado', error: error.message });
     }
 };
 

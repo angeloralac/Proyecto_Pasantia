@@ -26,11 +26,7 @@ const abrirCaja = async (req, res) => {
       return res.status(400).json({ error: 'Se requiere el ID del cajero (usuario) para abrir la caja.' });
     }
 
-    // Verificar si ya hay una caja abierta para evitar duplicados
-    const cajaExistente = await Caja.findOne({ where: { estado: 'abierta' } });
-    if (cajaExistente) {
-      return res.status(400).json({ error: 'Ya existe una caja abierta en el sistema. Debes cerrarla antes de abrir otra.' });
-    }
+    // ELIMINADO: La validación de caja existente. ¡Ahora tu middleware hace el trabajo sucio!
 
     const nuevaCaja = await Caja.create({
       monto_inicial: monto_inicial || 0,

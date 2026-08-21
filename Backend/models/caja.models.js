@@ -27,15 +27,15 @@ const Caja = Sequelize.define('Caja', {
   },
   monto_esperado: {
     type: DataTypes.DECIMAL(10, 2),
-    allowNull: true // Se calcula al cerrar la caja
+    allowNull: true 
   },
   monto_real: {
     type: DataTypes.DECIMAL(10, 2),
-    allowNull: true // El dinero físico contado por el cajero
+    allowNull: true 
   },
   diferencia: {
     type: DataTypes.DECIMAL(10, 2),
-    allowNull: true // Sobrante (positivo) o faltante (negativo)
+    allowNull: true 
   },
   fecha_apertura: {
     type: DataTypes.DATE,
